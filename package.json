@@ -1,0 +1,19 @@
+{
+  "name": "qwen-data-wrangler",
+  "private": true,
+  "version": "0.0.1",
+  "workspaces": [
+    "ui",
+    "server"
+  ],
+  "scripts": {
+    "dev": "concurrently -n server,ui -c blue,magenta \"npm -w server run dev\" \"npm -w ui run dev\"",
+    "dev:ui": "npm -w ui run dev",
+    "dev:server": "npm -w server run dev",
+    "build": "npm -w server run build && npm -w ui run build",
+    "typecheck": "npm -w server run typecheck && npm -w ui run typecheck"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}

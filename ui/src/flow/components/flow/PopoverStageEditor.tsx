@@ -1,0 +1,118 @@
+import { useEffect, useRef } from "react";
+import {
+  NodeToolbar,
+  Position,
+  useReactFlow,
+  useStore,
+  type Node,
+} from "@xyflow/react";
+
+import { StageConfigUI } from "@flow/components/config/StageConfigUI";
+import { useNodeToolbarPosition } from "./NodeToolbarPositionContext";
+import type { StageNodeData } from "@flow/types/Pipeline";
+import type { UpstreamColumnsLookup } from "@flow/Schema";
+
+const POPOVER_W = 340;
+const POPOVER_H = 520;
+const POPOVER_OFFSET = 16;
+const NODE_FALLBACK_W = 220;
+const NODE_FALLBACK_H = 110;
+const FOCUS_DURATION_MS = 300;
+
+interface PopoverStageEditorProps {
+  node: Node<StageNodeData>;
+  onUpdate: (id: string, patch: Partial<StageNodeData>) => void;
+  onDelete: (id: string) => void;
+  onCancel: () => void;
+  confirmBeforeDelete: boolean;
+  columnsLookup?: UpstreamColumnsLookup;
+}
+
+export function PopoverStageEditor({
+  node,
+  onUpdate,
+  onDelete,
+  onCancel,
+  confirmBeforeDelete,
+  columnsLookup,
+}: PopoverStageEditorProps) {
+  const position = useNodeToolbarPosition();
+  const reactFlow = useReactFlow();
+  const canvasHeight = useStore((s) => s.height);
+  const nodeId = node.id;
+  // Cap popover height to the canvas pane so it never exceeds the visible area.
+  // Subtract 2× offset for breathing room top + bottom.
+  const popoverMaxHeight =
+    canvasHeight > 0 ? Math.max(120, canvasHeight - POPOVER_OFFSET * 2) : null;
+
+  // Pan the canvas so the node + popover are both in view when the editor opens.
+  useEffect(() => {
+    const internal = reactFlow.getInternalNode(nodeId);
+    if (!internal) return;
+
+    const w = internal.measured?.width ?? NODE_FALLBACK_W;
+    const h = internal.measured?.height ?? NODE_FALLBACK_H;
+    const nodeX = internal.internals.positionAbsolute.x;
+    const nodeY = internal.internals.positionAbsolute.y;
+
+    let cx = nodeX + w / 2;
+    let cy = nodeY + h / 2;
+
+    switch (position) {
+      case Position.Right:
+        cx += (POPOVER_W + POPOVER_OFFSET) / 2;
+        break;
+      case Position.Left:
+        cx -= (POPOVER_W + POPOVER_OFFSET) / 2;
+        break;
+      case Position.Top:
+        cy -= (POPOVER_H + POPOVER_OFFSET) / 2;
+        break;
+      case Position.Bottom:
+        cy += (POPOVER_H + POPOVER_OFFSET) / 2;
+        break;
+    }
+
+    const { zoom } = reactFlow.getViewport();
+    reactFlow.setCenter(cx, cy, { zoom, duration: FOCUS_DURATION_MS });
+  }, [nodeId, position, reactFlow]);
+
+  // Capture the viewport at mount and restore it on unmount, so closing
+  // the popover puts the canvas back where it was before we panned to
+  // make room for the popover. Keyed on reactFlow only (stable), so
+  // switching focused nodes mid-open doesn't capture a new baseline.
+  const savedViewportRef = useRef<{ x: number; y: number; zoom: number } | null>(null);
+  useEffect(() => {
+    if (savedViewportRef.current === null) {
+      savedViewportRef.current = reactFlow.getViewport();
+    }
+    return () => {
+      const v = savedViewportRef.current;
+      if (v) reactFlow.setViewport(v, { duration: FOCUS_DURATION_MS });
+    };
+  }, [reactFlow]);
+
+  return (
+    <NodeToolbar
+      nodeId={nodeId}
+      isVisible
+      position={position}
+      offset={POPOVER_OFFSET}
+      className="!pointer-events-auto !flex !flex-col [&>*]:min-h-0"
+    >
+      <div
+        className="nowheel box-border grid w-[340px] grid-rows-[minmax(0,1fr)] overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-xl"
+        style={{ maxHeight: popoverMaxHeight != null ? `${popoverMaxHeight}px` : "85vh" }}
+      >
+        <StageConfigUI
+          node={node}
+          onUpdate={onUpdate}
+          onDelete={onDelete}
+          onCancel={onCancel}
+          confirmBeforeDelete={confirmBeforeDelete}
+          columnsLookup={columnsLookup}
+        />
+      </div>
+    </NodeToolbar>
+  );
+}

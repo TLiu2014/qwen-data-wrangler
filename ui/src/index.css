@@ -1,0 +1,17 @@
+@import "tailwindcss";
+
+/* Enable class-based dark mode: `dark:...` utilities flip when an ancestor
+   has the `dark` class. Toggled on <html> by useSettings. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-border: oklch(0.92 0.005 250);
+  --color-input: oklch(0.92 0.005 250);
+  --color-ring: oklch(0.6 0.18 255);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
